@@ -166,10 +166,11 @@ class Bibliophile:
                  stitches_per_block: int=10, 
                  blocks_per_line: int=1,
                  max_purl_run_len: int=12, 
-                 max_knit_run_len: int=2, 
+                 max_knit_run_len: int=3, 
                  purl_run_spacer_char: str='k', 
                  punctuation_mapping: int=2, 
-                 treat_zero_as_punctuation: bool=True
+                 treat_zero_as_punctuation: bool=True, 
+                 infinite_pattern: bool=True, 
                  ):
         
         self.text = text
@@ -180,6 +181,7 @@ class Bibliophile:
         self.purl_run_spacer_char = purl_run_spacer_char
         self.punctuation_mapping = punctuation_mapping
         self.treat_zero_as_punctuation = treat_zero_as_punctuation
+        self.infinite_pattern = infinite_pattern
         
         self.current_index = 0
         
@@ -300,6 +302,7 @@ class Bibliophile:
                             single_line: bool=False, 
                             stitches_per_block=None, 
                             blocks_per_line=None,
+                            infinite_pattern=None
                             ):
                    
         if single_line:
@@ -309,10 +312,30 @@ class Bibliophile:
         else:
             stitches_per_block = self.stitches_per_block if stitches_per_block is None else stitches_per_block
             blocks_per_line = self.blocks_per_line if blocks_per_line is None else blocks_per_line
+            
+        infinite_pattern = self.infinite_pattern if infinite_pattern is None else infinite_pattern
         
-        working_row = self.stitches[self.current_index:self.current_index+n_stitches]
-        self.current_index += n_stitches
-        self.called_stitch_counts.append(n_stitches)
+        if self.current_index + n_stitches > len(self.stitches):
+            remainder = self.current_index + n_stitches - len(self.stitches)
+            
+            if infinite_pattern:
+                working_row = self.stitches[self.current_index:]
+                self.current_index = 0
+                
+                working_row += self.stitches[self.current_index:remainder]
+                self.current_index += remainder
+                
+            else:
+                return ("\nYou've reached the end of your input text! Add more text or set infinite_pattern=True to loop back to the beginning of the sequence." + "The following is the remaining " + str(len(self.stitches) - self.current_index) + " stitches in the pattern. \n" + str(make_readable_pattern(self.stitches[self.current_index:], 
+                                        block_size=stitches_per_block, 
+                                        blocks_in_line=blocks_per_line
+                                        )))
+
+        
+        else:
+            working_row = self.stitches[self.current_index:self.current_index+n_stitches]
+            self.current_index += n_stitches
+            self.called_stitch_counts.append(n_stitches)
         
         pattern = make_readable_pattern(working_row, 
                                         block_size=stitches_per_block, 
@@ -323,11 +346,12 @@ class Bibliophile:
     def get_next_T_sequences(self, 
                         stitch_counts: List[int], 
                         start_row_num: int=1, 
-                        count_rows_by: int=2, 
+                        count_rows_by: int=4, 
                         seq_per_row: int=1, 
                         single_line: bool=True, 
                         stitches_per_block: int=None,
                         blocks_per_line: int=None, 
+                        infinite_pattern: bool=None
                         ):
         
         """
@@ -344,6 +368,10 @@ class Bibliophile:
             blocks_per_line (int): Number of stitch blocks per line, separated by tabs
     
         """
+
+        stitches_per_block = self.stitches_per_block if stitches_per_block is None else stitches_per_block
+        blocks_per_line = self.blocks_per_line if blocks_per_line is None else blocks_per_line
+        infinite_pattern = self.infinite_pattern if infinite_pattern is None else infinite_pattern
         
         pattern = []
         seq_num = 0
@@ -357,7 +385,9 @@ class Bibliophile:
             pattern.append('\nT' + str(seq_num+1) + ': (' + str(stitch_counts[i]) + ') \n')
             pattern.append(self.get_next_n_stitches(n_stitches=stitch_counts[i], 
                                                     single_line=single_line, 
-                                                    stitches_per_block=stitches_per_block, blocks_per_line=blocks_per_line
+                                                    stitches_per_block=stitches_per_block, 
+                                                    blocks_per_line=blocks_per_line,
+                                                    infinite_pattern=infinite_pattern
                                                     ))
             pattern.append('\n')
             seq_num += 1    
